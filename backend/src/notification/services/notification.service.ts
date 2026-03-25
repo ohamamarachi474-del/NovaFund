@@ -60,15 +60,6 @@ export class NotificationService {
     if (type === 'MILESTONE' && !settings.notifyMilestones) return;
     if (type === 'DEADLINE' && !settings.notifyDeadlines) return;
 
-    // Save in-app notification
-    await this.createInAppNotification({
-      userId,
-      title,
-      message,
-      data,
-      type,
-    });
-
     const tasks: Promise<any>[] = [];
 
     // Email
@@ -167,17 +158,6 @@ export class NotificationService {
       tasks.push(this.sendSms(phone, milestone.title, disputeUrl));
     }
 
-    // In-app
-    tasks.push(
-      this.createInAppNotification({
-        userId: investor.id,
-        title: `Milestone Disputed`,
-        message: `Milestone "${milestone.title}" is disputed.`,
-        data: { milestoneId: milestone.id },
-        type: 'MILESTONE',
-      }),
-    );
-
     await Promise.allSettled(tasks);
   }
 
@@ -240,24 +220,6 @@ export class NotificationService {
   // ─────────────────────────────────────────────────────────────
   // 🔹 IN-APP NOTIFICATIONS
   // ─────────────────────────────────────────────────────────────
-
-  private async createInAppNotification(params: {
-    userId: string;
-    title: string;
-    message: string;
-    type?: string;
-    data?: any;
-  }) {
-    await this.prisma.notification.create({
-      data: {
-        userId: params.userId,
-        type: params.type ?? 'SYSTEM',
-        title: params.title,
-        message: params.message,
-        data: params.data,
-      },
-    });
-  }
 
   // ─────────────────────────────────────────────────────────────
   // 🔹 EMAIL TEMPLATE
