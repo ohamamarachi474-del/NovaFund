@@ -17,6 +17,7 @@ pub struct IdentityRecord {
 pub enum DataKey {
     Admin,
     Verification(Address, Jurisdiction), // (Address, Jurisdiction) -> IdentityRecord
+    Oracle(Address), // Oracle Address -> bool (is whitelisted)
 }
 
 #[contract]
@@ -90,6 +91,57 @@ impl IdentityContract {
             record.is_verified = false;
             env.storage().persistent().set(&key, &record);
         }
+    }
+
+    /// Whitelists an oracle address
+    pub fn add_oracle(env: Env, admin: Address, oracle: Address) {
+        let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).expect("Not initialized");
+        if admin != stored_admin {
+            panic!("Unauthorized");
+        }
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Oracle(oracle), &true);
+    }
+
+    /// Removes an oracle from the whitelist
+    pub fn remove_oracle(env: Env, admin: Address, oracle: Address) {
+        let stored_admin: Address = env.storage().instance().get(&DataKey::Admin).expect("Not initialized");
+        if admin != stored_admin {
+            panic!("Unauthorized");
+        }
+        admin.require_auth();
+        env.storage().instance().remove(&DataKey::Oracle(oracle));
+    }
+
+    /// Checks if an address is an authorized oracle
+    pub fn is_oracle(env: Env, oracle: Address) -> bool {
+        env.storage().instance().get::<_, bool>(&DataKey::Oracle(oracle)).unwrap_or(false)
+    }
+
+    /// Allows an authorized oracle to update user KYC status
+    pub fn update_status_via_oracle(
+        env: Env,
+        oracle: Address,
+        user: Address,
+        jurisdiction: Jurisdiction,
+        tier: u32,
+        proof_hash: soroban_sdk::BytesN<32>,
+    ) {
+        oracle.require_auth();
+        if !Self::is_oracle(env.clone(), oracle) {
+            panic!("Unauthorized: Not an authorized oracle");
+        }
+
+        let record = IdentityRecord {
+            is_verified: true,
+            verified_at: env.ledger().timestamp(),
+            proof_hash,
+            tier,
+        };
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Verification(user, jurisdiction), &record);
     }
 }
 
