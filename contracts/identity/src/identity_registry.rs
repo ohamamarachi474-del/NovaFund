@@ -31,13 +31,19 @@ impl IdentityRegistryContract {
             panic!("Already initialized");
         }
         admin.require_auth();
-        env.storage().instance().set(&RegistryDataKey::Admin, &admin);
+        env.storage()
+            .instance()
+            .set(&RegistryDataKey::Admin, &admin);
     }
 
     /// Admin function to add or update an investor's KYC/AML info
     pub fn add(env: Env, admin: Address, user: Address, kyc_hash: BytesN<32>, tier: u32) {
         // Verify admin authorization
-        let stored_admin: Address = env.storage().instance().get(&RegistryDataKey::Admin).expect("Not initialized");
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&RegistryDataKey::Admin)
+            .expect("Not initialized");
         if admin != stored_admin {
             panic!("Unauthorized: Only admin can add identities");
         }
@@ -62,7 +68,11 @@ impl IdentityRegistryContract {
     /// Admin function to remove an investor's KYC/AML verification status
     pub fn remove(env: Env, admin: Address, user: Address) {
         // Verify admin authorization
-        let stored_admin: Address = env.storage().instance().get(&RegistryDataKey::Admin).expect("Not initialized");
+        let stored_admin: Address = env
+            .storage()
+            .instance()
+            .get(&RegistryDataKey::Admin)
+            .expect("Not initialized");
         if admin != stored_admin {
             panic!("Unauthorized: Only admin can remove identities");
         }
