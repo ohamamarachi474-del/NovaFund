@@ -130,10 +130,10 @@ describe('RpcFallbackService', () => {
       const mockOperation = jest.fn().mockRejectedValue(new Error('RPC failed'));
       const operationName = 'test-operation';
 
-      // Mock failed connections
-      jest.spyOn(SorobanRpc.Server.prototype, 'getLatestLedger').mockRejectedValue(
-        new Error('Connection failed')
-      );
+      // Mock successful health checks, so getRpcServer resolves and calls operation
+      jest.spyOn(SorobanRpc.Server.prototype, 'getLatestLedger').mockResolvedValue({
+        sequence: 12345,
+      } as any);
 
       await expect(service.executeRpcOperation(mockOperation, operationName)).rejects.toThrow();
       expect(mockOperation).toHaveBeenCalledTimes(service['rpcNodes'].length);
@@ -192,9 +192,7 @@ describe('RpcFallbackService', () => {
     it('should force switch to specific node', async () => {
       const nodeName = 'Backup-1';
       
-      // Ensure node is healthy
-      const status = service.getRpcStatus();
-      const targetNode = status.find(node => node.name === nodeName);
+      const targetNode = service['rpcNodes'].find(node => node.name === nodeName);
       if (targetNode) {
         targetNode.isHealthy = true;
       }
@@ -213,9 +211,7 @@ describe('RpcFallbackService', () => {
     it('should throw error when switching to unhealthy node', async () => {
       const nodeName = 'Primary';
       
-      // Mark node as unhealthy
-      const status = service.getRpcStatus();
-      const targetNode = status.find(node => node.name === nodeName);
+      const targetNode = service['rpcNodes'].find(node => node.name === nodeName);
       if (targetNode) {
         targetNode.isHealthy = false;
       }

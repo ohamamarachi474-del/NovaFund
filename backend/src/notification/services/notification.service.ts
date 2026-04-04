@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as sgMail from '@sendgrid/mail';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '../../prisma.service';
 import twilio from 'twilio';
 
 @Injectable()

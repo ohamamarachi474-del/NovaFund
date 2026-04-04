@@ -9,7 +9,7 @@ describe('ProjectService', () => {
   let prismaService: PrismaService;
   let redisService: RedisService;
 
-  const mockProject: Project = {
+  const mockProjectDb = {
     id: 'test-project-id',
     contractId: '123',
     creatorId: 'test-creator-id',
@@ -18,15 +18,23 @@ describe('ProjectService', () => {
     category: 'technology',
     goal: 1000,
     currentFunds: 500,
-    deadline: '2024-12-31T23:59:59.000Z',
+    deadline: new Date('2024-12-31T23:59:59.000Z'),
     ipfsHash: 'test-ipfs-hash',
     status: 'ACTIVE',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2024-01-01T00:00:00.000Z'),
     _count: {
       contributions: 5,
       milestones: 3,
     },
+  };
+
+  const mockProject: Project = {
+    ...mockProjectDb,
+    deadline: mockProjectDb.deadline.toISOString() as any,
+    status: mockProjectDb.status as any,
+    createdAt: mockProjectDb.createdAt.toISOString() as any,
+    updatedAt: mockProjectDb.updatedAt.toISOString() as any,
   };
 
   beforeEach(async () => {
@@ -80,7 +88,7 @@ describe('ProjectService', () => {
       const result = await service.findById(projectId);
 
       // Assert
-      expect(redisService.get).toHaveBeenCalledWith(`novafund:project:${projectId}`);
+      expect(redisService.get).toHaveBeenCalledWith(`project:${projectId}`);
       expect(result).toEqual(mockProject);
       expect(prismaService.project.findUnique).not.toHaveBeenCalled();
     });
@@ -89,14 +97,14 @@ describe('ProjectService', () => {
       // Arrange
       const projectId = 'test-project-id';
       jest.spyOn(redisService, 'get').mockResolvedValue(undefined);
-      jest.spyOn(prismaService.project, 'findUnique').mockResolvedValue(mockProject as any);
+      jest.spyOn(prismaService.project, 'findUnique').mockResolvedValue(mockProjectDb as any);
       jest.spyOn(redisService, 'set').mockResolvedValue(undefined);
 
       // Act
       const result = await service.findById(projectId);
 
       // Assert
-      expect(redisService.get).toHaveBeenCalledWith(`novafund:project:${projectId}`);
+      expect(redisService.get).toHaveBeenCalledWith(`project:${projectId}`);
       expect(prismaService.project.findUnique).toHaveBeenCalledWith({
         where: { id: projectId },
         include: {
@@ -109,7 +117,7 @@ describe('ProjectService', () => {
         },
       });
       expect(redisService.set).toHaveBeenCalledWith(
-        `novafund:project:${projectId}`,
+        `project:${projectId}`,
         expect.any(Object),
         300
       );

@@ -1,12 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationController } from './notification.controller';
 
+import { PrismaService } from '../prisma.service';
+
 describe('NotificationController', () => {
   let controller: NotificationController;
 
   beforeEach(async () => {
+    const mockPrismaService = {};
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationController],
+      providers: [
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
+      ],
     }).compile();
 
     controller = module.get<NotificationController>(NotificationController);
