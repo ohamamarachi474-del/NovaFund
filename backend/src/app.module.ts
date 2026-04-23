@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { AppController } from './app.controller';
-import { UserController } from './user.controller';
 import { AppService } from './app.service';
 import { validateEnv } from './config/env.validation';
 import { ReputationModule } from './reputation/reputation.module';
@@ -19,6 +18,7 @@ import { ProjectModule } from './project/project.module';
 import { StellarModule } from './stellar/stellar.module';
 import { OracleModule } from './oracle/oracle.module';
 import { GraphQLRateLimitModule } from './graphql/graphql-rate-limit.module';
+import { UserModule } from './user/user.module';
 import { ShortlinkModule } from './shortlink/shortlink.module';
 
 @Module({
@@ -46,9 +46,10 @@ import { ShortlinkModule } from './shortlink/shortlink.module';
     VerificationModule,
     ProjectModule,
     OracleModule,
+    UserModule,
     ShortlinkModule,
   ],
-  controllers: [AppController, UserController],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
