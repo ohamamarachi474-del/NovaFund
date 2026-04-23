@@ -22,13 +22,16 @@ model User {
   // Notification fields
   email            String? @unique
   pushSubscription Json?   @map("push_subscription")
+  isFrozen       Boolean   @default(false) @map("is_frozen")
 
   // Relations
   createdProjects      Project[]            @relation("ProjectCreator")
   contributions        Contribution[]
   reputationHistory    ReputationHistory[]
   notificationSettings NotificationSetting?
+  notificationMatrix   NotificationMatrix[]
   notifications        Notification[]
+  freezeRequests       AccountFreezeRequest[]
 
   @@map("users")
 }
@@ -170,6 +173,8 @@ model NotificationSetting {
   user                User     @relation(fields: [userId], references: [id])
   emailEnabled        Boolean  @default(true) @map("email_enabled")
   pushEnabled         Boolean  @default(false) @map("push_enabled")
+  appEnabled          Boolean  @default(true) @map("app_enabled")
+  smsEnabled          Boolean  @default(false) @map("sms_enabled")
   notifyContributions Boolean  @default(true) @map("notify_contributions")
   notifyMilestones    Boolean  @default(true) @map("notify_milestones")
   notifyDeadlines     Boolean  @default(true) @map("notify_deadlines")
@@ -177,6 +182,21 @@ model NotificationSetting {
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   @@map("notification_settings")
+}
+
+model NotificationMatrix {
+  id         String                @id @default(cuid())
+  userId     String                @map("user_id")
+  user       User                  @relation(fields: [userId], references: [id])
+  eventType  NotificationType      @map("event_type")
+  channel    NotificationChannel   @map("channel")
+  enabled    Boolean               @default(true)
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+
+  @@unique([userId, eventType, channel])
+  @@index([userId])
+  @@map("notification_matrix")
 }
 
 model Notification {
@@ -209,10 +229,91 @@ model EmailOutbox {
   @@map("email_outbox")
 }
 
+model WebhookSubscription {
+  id          String     @id @default(cuid())
+  creatorId   String     @map("creator_id")
+  creator     User       @relation(fields: [creatorId], references: [id])
+  projectId   String?    @map("project_id")
+  targetUrl   String     @map("target_url")
+  secret      String
+  events      Json       @map("events")
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  deliveries  WebhookDelivery[]
+
+  @@index([creatorId])
+  @@index([projectId])
+  @@map("webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id             String                 @id @default(cuid())
+  subscriptionId String                 @map("subscription_id")
+  subscription   WebhookSubscription    @relation(fields: [subscriptionId], references: [id])
+  eventType      NotificationType       @map("event_type")
+  payload        Json
+  status         WebhookDeliveryStatus  @default(PENDING)
+  attempts       Int                    @default(0)
+  nextAttemptAt  DateTime?              @map("next_attempt_at")
+  lastError      String?                @map("last_error")
+  deliveredAt    DateTime?              @map("delivered_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([nextAttemptAt])
+  @@map("webhook_deliveries")
+}
+
+model AccountFreezeRequest {
+  id          String              @id @default(cuid())
+  userId      String              @map("user_id")
+  user        User                @relation(fields: [userId], references: [id])
+  reporterId  String?             @map("reporter_id")
+  reporter    User?               @relation("freezeReporter", fields: [reporterId], references: [id])
+  reason      String
+  evidenceUrl String?             @map("evidence_url")
+  status      FreezeRequestStatus @default(PENDING)
+  adminNotes  String?             @map("admin_notes")
+  reviewedBy  String?             @map("reviewed_by")
+  reviewedAt  DateTime?           @map("reviewed_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@map("account_freeze_requests")
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model BridgeTransaction {
+  CONTRIBUTION
+  MILESTONE
+  DEADLINE
+  YIELD
+  SYSTEM
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  APP
+}
+
 enum NotificationType {
   CONTRIBUTION
   MILESTONE
   DEADLINE
+  YIELD
   SYSTEM
 }
 
