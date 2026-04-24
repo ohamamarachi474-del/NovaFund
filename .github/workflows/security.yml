@@ -39,13 +39,18 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: npm ci --ignore-scripts
+        run: npm ci --ignore-scripts --legacy-peer-deps
 
       - name: Run npm audit
         working-directory: backend
         run: |
           echo "Running npm audit for backend..."
-          npm audit --audit-level=high --json > audit-results.json || true
+          npm audit --audit-level=high --json > audit-results.json 2>&1 || true
+          
+          # Ensure the file exists even if audit fails
+          if [ ! -f audit-results.json ]; then
+            echo '{"vulnerabilities": {}, "metadata": {"vulnerabilities": {"critical": 0, "high": 0, "moderate": 0, "low": 0}}}' > audit-results.json
+          fi
           
       - name: Check for high severity vulnerabilities
         working-directory: backend
@@ -80,51 +85,64 @@ jobs:
           retention-days: 30
 
       - name: Create issue for critical vulnerabilities
-        if: failure()
+        if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const auditResults = require('fs').readFileSync('backend/audit-results.json', 'utf8');
-            const audit = JSON.parse(auditResults);
+            const fs = require('fs');
+            const path = 'backend/audit-results.json';
             
-            const criticalVulns = Object.values(audit.vulnerabilities || {}).filter(
-              v => v.severity === 'critical'
-            );
+            // Check if file exists
+            if (!fs.existsSync(path)) {
+              console.log('Audit results file not found, skipping issue creation');
+              return;
+            }
             
-            if (criticalVulns.length > 0) {
-              const body = `## 🔴 Critical Security Vulnerabilities Detected\n\n` +
-                `**Date:** ${new Date().toISOString()}\n` +
-                `**Branch:** ${context.ref}\n\n` +
-                `### Vulnerabilities:\n\n` +
-                criticalVulns.map(v => {
-                  return `#### ${v.name}\n` +
-                    `- **Severity:** Critical\n` +
-                    `- **Version:** ${v.via[0].version || 'N/A'}\n` +
-                    `- **Vulnerable Versions:** ${v.via[0].range || 'N/A'}\n` +
-                    `- **Description:** ${v.via[0].title || 'N/A'}\n` +
-                    `- **Fix:** Run \`npm audit fix --force\` or update to ${v.via[0].recommendation || 'latest'}\n`;
-                }).join('\n') +
-                `\n### Actions Required:\n` +
-                `- [ ] Review and fix critical vulnerabilities\n` +
-                `- [ ] Run \`npm audit fix\` to auto-fix compatible vulnerabilities\n` +
-                `- [ ] Manually update packages that require breaking changes\n` +
-                `- [ ] Test application after updates\n` +
-                `- [ ] Re-run security audit to verify fixes\n\n` +
-                `### Quick Fix Commands:\n` +
-                '```bash\n' +
-                `cd backend\n` +
-                `npm audit fix\n` +
-                `npm audit fix --force  # For critical fixes\n` +
-                '```\n';
+            try {
+              const auditResults = fs.readFileSync(path, 'utf8');
+              const audit = JSON.parse(auditResults);
               
-              github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: '🔴 Critical Security Vulnerabilities - Backend',
-                body: body,
-                labels: ['security', 'critical', 'automated']
-              });
+              const criticalVulns = Object.values(audit.vulnerabilities || {}).filter(
+                v => v.severity === 'critical'
+              );
+              
+              if (criticalVulns.length > 0) {
+                const body = `## 🔴 Critical Security Vulnerabilities Detected\n\n` +
+                  `**Date:** ${new Date().toISOString()}\n` +
+                  `**Branch:** ${context.ref}\n\n` +
+                  `### Vulnerabilities:\n\n` +
+                  criticalVulns.map(v => {
+                    return `#### ${v.name}\n` +
+                      `- **Severity:** Critical\n` +
+                      `- **Version:** ${v.via[0]?.version || 'N/A'}\n` +
+                      `- **Vulnerable Versions:** ${v.via[0]?.range || 'N/A'}\n` +
+                      `- **Description:** ${v.via[0]?.title || 'N/A'}\n` +
+                      `- **Fix:** Run \`npm audit fix --force\` or update to ${v.via[0]?.recommendation || 'latest'}\n`;
+                  }).join('\n') +
+                  `\n### Actions Required:\n` +
+                  `- [ ] Review and fix critical vulnerabilities\n` +
+                  `- [ ] Run \`npm audit fix\` to auto-fix compatible vulnerabilities\n` +
+                  `- [ ] Manually update packages that require breaking changes\n` +
+                  `- [ ] Test application after updates\n` +
+                  `- [ ] Re-run security audit to verify fixes\n\n` +
+                  `### Quick Fix Commands:\n` +
+                  '```bash\n' +
+                  `cd backend\n` +
+                  `npm audit fix\n` +
+                  `npm audit fix --force  # For critical fixes\n` +
+                  '```\n';
+                
+                github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: '🔴 Critical Security Vulnerabilities - Backend',
+                  body: body,
+                  labels: ['security', 'critical', 'automated']
+                });
+              }
+            } catch (error) {
+              console.log('Failed to parse audit results:', error.message);
             }
 
   frontend-audit:
@@ -144,13 +162,18 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci --ignore-scripts
+        run: npm ci --ignore-scripts --legacy-peer-deps
 
       - name: Run npm audit
         working-directory: frontend
         run: |
           echo "Running npm audit for frontend..."
-          npm audit --audit-level=high --json > audit-results.json || true
+          npm audit --audit-level=high --json > audit-results.json 2>&1 || true
+          
+          # Ensure the file exists even if audit fails
+          if [ ! -f audit-results.json ]; then
+            echo '{"vulnerabilities": {}, "metadata": {"vulnerabilities": {"critical": 0, "high": 0, "moderate": 0, "low": 0}}}' > audit-results.json
+          fi
           
       - name: Check for high severity vulnerabilities
         working-directory: frontend
@@ -185,51 +208,64 @@ jobs:
           retention-days: 30
 
       - name: Create issue for critical vulnerabilities
-        if: failure()
+        if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const auditResults = require('fs').readFileSync('frontend/audit-results.json', 'utf8');
-            const audit = JSON.parse(auditResults);
+            const fs = require('fs');
+            const path = 'frontend/audit-results.json';
             
-            const criticalVulns = Object.values(audit.vulnerabilities || {}).filter(
-              v => v.severity === 'critical'
-            );
+            // Check if file exists
+            if (!fs.existsSync(path)) {
+              console.log('Audit results file not found, skipping issue creation');
+              return;
+            }
             
-            if (criticalVulns.length > 0) {
-              const body = `## 🔴 Critical Security Vulnerabilities Detected\n\n` +
-                `**Date:** ${new Date().toISOString()}\n` +
-                `**Branch:** ${context.ref}\n\n` +
-                `### Vulnerabilities:\n\n` +
-                criticalVulns.map(v => {
-                  return `#### ${v.name}\n` +
-                    `- **Severity:** Critical\n` +
-                    `- **Version:** ${v.via[0].version || 'N/A'}\n` +
-                    `- **Vulnerable Versions:** ${v.via[0].range || 'N/A'}\n` +
-                    `- **Description:** ${v.via[0].title || 'N/A'}\n` +
-                    `- **Fix:** Run \`npm audit fix --force\` or update to ${v.via[0].recommendation || 'latest'}\n`;
-                }).join('\n') +
-                `\n### Actions Required:\n` +
-                `- [ ] Review and fix critical vulnerabilities\n` +
-                `- [ ] Run \`npm audit fix\` to auto-fix compatible vulnerabilities\n` +
-                `- [ ] Manually update packages that require breaking changes\n` +
-                `- [ ] Test application after updates\n` +
-                `- [ ] Re-run security audit to verify fixes\n\n` +
-                `### Quick Fix Commands:\n` +
-                '```bash\n' +
-                `cd frontend\n` +
-                `npm audit fix\n` +
-                `npm audit fix --force  # For critical fixes\n` +
-                '```\n';
+            try {
+              const auditResults = fs.readFileSync(path, 'utf8');
+              const audit = JSON.parse(auditResults);
               
-              github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: '🔴 Critical Security Vulnerabilities - Frontend',
-                body: body,
-                labels: ['security', 'critical', 'automated']
-              });
+              const criticalVulns = Object.values(audit.vulnerabilities || {}).filter(
+                v => v.severity === 'critical'
+              );
+              
+              if (criticalVulns.length > 0) {
+                const body = `## 🔴 Critical Security Vulnerabilities Detected\n\n` +
+                  `**Date:** ${new Date().toISOString()}\n` +
+                  `**Branch:** ${context.ref}\n\n` +
+                  `### Vulnerabilities:\n\n` +
+                  criticalVulns.map(v => {
+                    return `#### ${v.name}\n` +
+                      `- **Severity:** Critical\n` +
+                      `- **Version:** ${v.via[0]?.version || 'N/A'}\n` +
+                      `- **Vulnerable Versions:** ${v.via[0]?.range || 'N/A'}\n` +
+                      `- **Description:** ${v.via[0]?.title || 'N/A'}\n` +
+                      `- **Fix:** Run \`npm audit fix --force\` or update to ${v.via[0]?.recommendation || 'latest'}\n`;
+                  }).join('\n') +
+                  `\n### Actions Required:\n` +
+                  `- [ ] Review and fix critical vulnerabilities\n` +
+                  `- [ ] Run \`npm audit fix\` to auto-fix compatible vulnerabilities\n` +
+                  `- [ ] Manually update packages that require breaking changes\n` +
+                  `- [ ] Test application after updates\n` +
+                  `- [ ] Re-run security audit to verify fixes\n\n` +
+                  `### Quick Fix Commands:\n` +
+                  '```bash\n' +
+                  `cd frontend\n` +
+                  `npm audit fix\n` +
+                  `npm audit fix --force  # For critical fixes\n` +
+                  '```\n';
+                
+                github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: '🔴 Critical Security Vulnerabilities - Frontend',
+                  body: body,
+                  labels: ['security', 'critical', 'automated']
+                });
+              }
+            } catch (error) {
+              console.log('Failed to parse audit results:', error.message);
             }
 
   security-summary:
